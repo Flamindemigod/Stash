@@ -59,7 +59,7 @@ int main(int argc, char *argv[]) {
   generate_build_folder();
   Nob_Cmd cmd = {0};
   if (!build_stash(&cmd)) {
-    nob_log(NOB_ERROR, "Failed to build stash\nExiting\n");
+    nob_log(NOB_ERROR, "Failed to build stash");
     nob_return_defer(EXIT_FAILURE);
   }
 
