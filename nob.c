@@ -8,7 +8,7 @@ int getCommitHash(Nob_Cmd *cmd) {
   int retVal = 1;
   Nob_String_Builder sb = {0};
   nob_cmd_append(cmd, "/bin/sh", "-c",
-                 "echo $(git rev-parse HEAD) > ./build/commit");
+                 "echo $(git describe --tags --exact-match 2>/dev/null || git rev-parse HEAD) > ./build/commit");
   retVal = nob_cmd_run_sync(*cmd);
   cmd->count = 0;
   if (!retVal)
