@@ -1,6 +1,6 @@
-#include "opts.h"
-#include "nob.h"
 #include "build/config.h"
+#include "manifest.h"
+#include "nob.h"
 
 #define MATCH_ARG(arg) (strcmp(subcommand, arg) == 0)
 
@@ -19,9 +19,11 @@ void printUsage(Opts *opts) {
   nob_sb_append_cstr(
       &sb, nob_temp_sprintf("%s [-h | --help] [-v | --version] {...Options}\n",
                             opts->program));
-  nob_sb_append_cstr(&sb, "\tOptions\n");
-  nob_sb_append_cstr(&sb,
-                     "\t\t--manifest {MANIFEST}\t\tDefault: ./.MANIFEST\n");
+  nob_sb_append_cstr(&sb, "Options\n");
+  nob_sb_append_cstr(&sb, "\t--manifest {MANIFEST}\t\tDefault: "
+                          "./.MANIFEST\tConflicts with --generate-manifest\n");
+  nob_sb_append_cstr(&sb, "\t--generate-manifest {MANIFEST}\tDefault: "
+                          "./.MANIFEST\tConflicts with --manifest\n");
   nob_sb_append_null(&sb);
   fprintf(stderr, "%s", sb.items);
   nob_sb_free(sb);
@@ -35,38 +37,63 @@ void printVersion(Opts *opts) {
   nob_sb_free(sb);
 }
 
-bool parseOpts(Opts *opts, int *argc, char ***argv){
-  bool result = true;
+int parseOpts(Opts *opts, int *argc, char ***argv) {
+  int result = PARSED_NOW_CONTINUE;
   init_opts(opts);
   opts->program = nob_shift_args(argc, argv);
   while (*argc > 0) {
     char *subcommand = nob_shift_args(argc, argv);
     if (MATCH_ARG("--help") || MATCH_ARG("-h")) {
       printUsage(opts);
-      nob_return_defer(true);
-    } 
+      nob_return_defer(PARSED_NOW_EXIT);
+    }
     if (MATCH_ARG("--version") || MATCH_ARG("-v")) {
       printVersion(opts);
-      nob_return_defer(true);
-    } 
+      nob_return_defer(PARSED_NOW_EXIT);
+    }
     if MATCH_ARG ("--manifest") {
       if (*argc <= 0) {
         nob_log(NOB_ERROR, "--manifest requires a path");
         printUsage(opts);
-        nob_return_defer(false);
+        nob_return_defer(FAILED_PARSING);
       } else {
         char *manifest_path = nob_shift_args(argc, argv);
         if (nob_file_exists(manifest_path)) {
           opts->manifest = manifest_path;
+          nob_return_defer(PARSED_NOW_CONTINUE);
         } else {
-          nob_log(NOB_ERROR, "%s does not exist. Exiting", manifest_path);
-          nob_return_defer(false);
+          nob_log(NOB_ERROR, "%s does not exist.", manifest_path);
+          nob_log(NOB_INFO, "if you want to generate a config at %s",
+                  manifest_path);
+          nob_log(NOB_INFO, "run '%s --generate-manifest %s'", opts->program,
+                  manifest_path);
+          nob_return_defer(FAILED_PARSING);
+        }
+      }
+    } else if MATCH_ARG ("--generate-manifest") {
+      if (*argc <= 0) {
+        nob_log(NOB_ERROR, "--generate-manifest requires a path");
+        printUsage(opts);
+        nob_return_defer(FAILED_PARSING);
+      } else {
+        char *manifest_path = nob_shift_args(argc, argv);
+        if (nob_file_exists(manifest_path)) {
+          nob_log(NOB_ERROR, "%s exists.", manifest_path);
+          nob_log(NOB_INFO, "if you want to use a existing config at %s",
+                  manifest_path);
+          nob_log(NOB_INFO, "run '%s --manifest %s'", opts->program,
+                  manifest_path);
+          nob_return_defer(FAILED_PARSING);
+        } else {
+          opts->manifest = manifest_path;
+          generate_example_manifest(opts);
+          nob_return_defer(PARSED_NOW_EXIT);
         }
       }
     } else {
       nob_log(NOB_ERROR, "Invalid Subcommand %s", subcommand);
       printUsage(opts);
-      nob_return_defer(false);
+      nob_return_defer(FAILED_PARSING);
     }
   }
 defer:

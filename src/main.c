@@ -2,22 +2,26 @@
 
 #include "manifest.h"
 #define NOB_IMPLEMENTATION
-#include "nob.h"
 #include "build/config.h"
-
+#include "nob.h"
 
 int main(int argc, char **argv) {
   Opts opts = {0};
-  if (!parseOpts(&opts, &argc, &argv)){
-    nob_log(NOB_ERROR, "Failed to parse command line options\n");
+  Manifest manifest = {0};
+  int parseOptsRes = parseOpts(&opts, &argc, &argv);
+  switch (parseOptsRes) {
+  case FAILED_PARSING:
     return 1;
+  case PARSED_NOW_EXIT:
+    return 0;
+  case PARSED_NOW_CONTINUE:
+    break;
   }
-  if (nob_file_exists(opts.manifest))
-  {
-  parse_manifest(&opts);
-  } else{
+  if (nob_file_exists(opts.manifest)) {
+    parse_manifest(&opts, &manifest);
+  } else {
     generate_example_manifest(&opts);
   }
-  
+
   return 0;
 }
