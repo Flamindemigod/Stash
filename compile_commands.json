@@ -14,5 +14,53 @@
     "directory": "/run/media/flamin/LAtlas/stash",
     "file": "/run/media/flamin/LAtlas/stash/src/main.c",
     "output": "/run/media/flamin/LAtlas/stash/build/stash"
+  },
+  {
+    "arguments": [
+      "/usr/bin/cc",
+      "-c",
+      "-Wall",
+      "-Wextra",
+      "-ggdb",
+      "-I.",
+      "-o",
+      "./build/stash",
+      "./src/manifest.c"
+    ],
+    "directory": "/run/media/flamin/LAtlas/stash",
+    "file": "/run/media/flamin/LAtlas/stash/src/manifest.c",
+    "output": "/run/media/flamin/LAtlas/stash/build/stash"
+  },
+  {
+    "arguments": [
+      "/usr/bin/cc",
+      "-c",
+      "-Wall",
+      "-Wextra",
+      "-ggdb",
+      "-I.",
+      "-o",
+      "./build/stash",
+      "./src/manifest.h"
+    ],
+    "directory": "/run/media/flamin/LAtlas/stash",
+    "file": "/run/media/flamin/LAtlas/stash/src/manifest.h",
+    "output": "/run/media/flamin/LAtlas/stash/build/stash"
+  },
+  {
+    "arguments": [
+      "/usr/bin/cc",
+      "-c",
+      "-Wall",
+      "-Wextra",
+      "-ggdb",
+      "-I.",
+      "-o",
+      "./build/stash",
+      "./src/opts.h"
+    ],
+    "directory": "/run/media/flamin/LAtlas/stash",
+    "file": "/run/media/flamin/LAtlas/stash/src/opts.h",
+    "output": "/run/media/flamin/LAtlas/stash/build/stash"
   }
 ]

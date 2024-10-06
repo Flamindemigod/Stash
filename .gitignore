@@ -3,3 +3,4 @@ nob.old
 build/
 
 .cache
+.MANIFEST
