@@ -69,7 +69,7 @@ char* get_realpath(Opts *opts, Nob_String_View sv) {
     sb.count = 0;
   }
   
-  nob_sb_append_cstr(&sb, dirname(nob_temp_sv_to_cstr(sv)));
+  nob_sb_append_cstr(&sb, dirname((char*)nob_temp_sv_to_cstr(sv)));
   const char *path = nob_temp_sv_to_cstr(nob_sv_from_parts(sb.items, sb.count));
   char *res = realpath(path, 0);
   if (res == NULL) {
@@ -81,7 +81,7 @@ char* get_realpath(Opts *opts, Nob_String_View sv) {
   sb.count = 0;
   nob_sb_append_cstr(&sb, res);
   nob_sb_append_cstr(&sb, "/");
-  nob_sb_append_cstr(&sb, basename(nob_temp_sv_to_cstr(sv)));
+  nob_sb_append_cstr(&sb, basename((char*)nob_temp_sv_to_cstr(sv)));
   nob_return_defer(strdup(nob_temp_sv_to_cstr(nob_sv_from_parts(sb.items, sb.count))));
 defer:
   free(res);
