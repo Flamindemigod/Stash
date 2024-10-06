@@ -6,6 +6,7 @@
 
 void init_opts(Opts *opts) {
   opts->manifest = "./.MANIFEST";
+  opts->dryRun = false;
 #ifdef VERSION
   opts->version = VERSION;
 #else
@@ -20,10 +21,14 @@ void printUsage(Opts *opts) {
       &sb, nob_temp_sprintf("%s [-h | --help] [-v | --version] {...Options}\n",
                             opts->program));
   nob_sb_append_cstr(&sb, "Options\n");
-  nob_sb_append_cstr(&sb, "\t--manifest {MANIFEST}\t\tDefault: "
-                          "./.MANIFEST\tConflicts with --generate-manifest\n");
-  nob_sb_append_cstr(&sb, "\t--generate-manifest {MANIFEST}\tDefault: "
-                          "./.MANIFEST\tConflicts with --manifest\n");
+  nob_sb_append_cstr(&sb, "\t--manifest {MANIFEST}\t\tDefault: ./.MANIFEST"
+                          "\n\t\t\t\t\tConflicts with --generate-manifest\n\n");
+  nob_sb_append_cstr(&sb,
+                     "\t--generate-manifest {MANIFEST}\tDefault: ./.MANIFEST"
+                     "\n\t\t\t\t\tConflicts with --manifest\n\n");
+  nob_sb_append_cstr(&sb, "\t--dry-run\t\t\t"
+                          "No file changes take place.\n\t\t\t\t\t"
+                          "Just outputs what links where\n");
   nob_sb_append_null(&sb);
   fprintf(stderr, "%s", sb.items);
   nob_sb_free(sb);
@@ -60,7 +65,6 @@ int parseOpts(Opts *opts, int *argc, char ***argv) {
         char *manifest_path = nob_shift_args(argc, argv);
         if (nob_file_exists(manifest_path)) {
           opts->manifest = manifest_path;
-          nob_return_defer(PARSED_NOW_CONTINUE);
         } else {
           nob_log(NOB_ERROR, "%s does not exist.", manifest_path);
           nob_log(NOB_INFO, "if you want to generate a config at %s",
@@ -90,6 +94,8 @@ int parseOpts(Opts *opts, int *argc, char ***argv) {
           nob_return_defer(PARSED_NOW_EXIT);
         }
       }
+    } else if MATCH_ARG ("--dry-run") {
+      opts->dryRun = true;
     } else {
       nob_log(NOB_ERROR, "Invalid Subcommand %s", subcommand);
       printUsage(opts);

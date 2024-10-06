@@ -54,6 +54,7 @@ bool parse_manifest(Opts *opts, Manifest *manifest) {
   Nob_String_Builder sb = {0};
   Nob_String_View sv, sv_seg, src, dest, mode;
   enum LINKMODE link_mode;
+  nob_log(NOB_INFO, "Parsing manifest at %s", opts->manifest);
   nob_read_entire_file(opts->manifest, &sb);
   sv = nob_sv_from_parts(sb.items, sb.count);
   sv = nob_sv_trim(sv);
@@ -90,8 +91,10 @@ bool parse_manifest(Opts *opts, Manifest *manifest) {
                                    nob_temp_sv_to_cstr(dest), link_mode}));
   }
 defer:
-  for(size_t i = 0; i < manifest->count; i++){
-    printf("Manifest field \n\tSrc: %s\n\tDest: %s\n\tMode: %d\n", manifest->items[i].src, manifest->items[i].dest, manifest->items[i].mode);
+  for (size_t i = 0; i < manifest->count; i++) {
+    printf("Manifest field \n\tSrc: %s\n\tDest: %s\n\tMode: %d\n",
+           manifest->items[i].src, manifest->items[i].dest,
+           manifest->items[i].mode);
   }
   nob_sb_free(sb);
   return result;

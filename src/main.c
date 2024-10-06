@@ -17,10 +17,13 @@ int main(int argc, char **argv) {
     break;
   }
   if (nob_file_exists(opts.manifest)) {
+    nob_log(NOB_INFO, "Parsing manifest");
     parse_manifest(&opts, &manifest);
   } else {
     generate_example_manifest(&opts);
+    nob_return_defer(0);
   }
-
-  return 0;
+defer:
+  nob_da_free(manifest);
+  return result;
 }

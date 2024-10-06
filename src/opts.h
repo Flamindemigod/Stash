@@ -1,7 +1,10 @@
+#include<stdbool.h>
+
 typedef struct {
   char *program;
   char *manifest;
   char *version;
+  bool dryRun;
 } Opts;
 
 #define FAILED_PARSING 0
