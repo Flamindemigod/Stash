@@ -38,7 +38,7 @@ void init_opts(Opts *opts) {
 #ifdef VERSION
   opts->version = VERSION;
 #else
-  opts->version = "dev";
+  opts->version = "dev-unknown-commit";
 #endif
 }
 
