@@ -1,0 +1,4 @@
+CompileFlags:
+  Compiler: cc
+  Add: [-Wall, -Wextra, -ggdb, -I.]
+
