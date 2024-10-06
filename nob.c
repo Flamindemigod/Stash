@@ -48,7 +48,11 @@ int build_stash(Nob_Cmd *cmd) {
     return 0;
   };
   nob_cmd_append(cmd, "cc");
+#if 1
   nob_cmd_append(cmd, "-Wall", "-Wextra", "-ggdb");
+#else
+  nob_cmd_append(cmd, "-Os");
+#endif
   nob_cmd_append(cmd, "-I.");
   nob_cmd_append(cmd, "-o", "./build/stash");
   nob_cmd_append(cmd, "./src/main.c", "./src/opts.c", "./src/manifest.c");
