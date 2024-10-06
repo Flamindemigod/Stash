@@ -49,8 +49,9 @@ int build_stash(Nob_Cmd *cmd) {
   };
   nob_cmd_append(cmd, "cc");
   nob_cmd_append(cmd, "-Wall", "-Wextra", "-ggdb");
+  nob_cmd_append(cmd, "-I.");
   nob_cmd_append(cmd, "-o", "./build/stash");
-  nob_cmd_append(cmd, "main.c");
+  nob_cmd_append(cmd, "./src/main.c");
   retVal = nob_cmd_run_sync(*cmd);
   cmd->count = 0;
   return retVal;
