@@ -18,3 +18,4 @@ typedef struct {
 bool parse_manifest(Opts *opts, Manifest *manifest);
 bool generate_example_manifest(Opts *opts);
 void free_manifest(Manifest *manifest);
+bool link_manifest(Opts *opts, Manifest *manifest);

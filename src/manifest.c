@@ -1,6 +1,7 @@
 #include "manifest.h"
 #include "nob.h"
 #include <libgen.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -52,57 +53,80 @@ defer:
   return result;
 }
 
-char* get_realpath(Opts *opts, Nob_String_View sv) {
+char *resolveHome(const char *path) {
   char *result = NULL;
   Nob_String_Builder sb = {0};
-  if (sv.data[0] != '~') {
-    char *manifest_dir = dirname(opts->manifest);
+  size_t path_len = strlen(path);
+  if (path_len <= 0) {
+    nob_return_defer(NULL);
+  }
+  if (path[0] == '~') {
+    const char *home = getenv("HOME");
+    nob_sb_append_cstr(&sb, home);
+    path++;
+    path_len--;
+  }
+  nob_sb_append_buf(&sb, path, path_len);
+  nob_return_defer(
+      strdup(nob_temp_sv_to_cstr(nob_sv_from_parts(sb.items, sb.count))));
+defer:
+  nob_sb_free(sb);
+  return result;
+}
+
+char *get_realpath(Opts *opts, const char *path) {
+  char *result = NULL;
+  Nob_String_Builder sb = {0};
+  char *dir_path = NULL, *manifest_dir = NULL, *path_out = NULL;
+  size_t path_len = strlen(path);
+  if (path_len <= 0) {
+    nob_return_defer(NULL);
+  }
+  if (path[0] != '~') {
+    manifest_dir = dirname(opts->manifest);
     nob_sb_append_cstr(&sb, manifest_dir);
     nob_sb_append_cstr(&sb, "/");
   } else {
     const char *home = getenv("HOME");
     nob_sb_append_cstr(&sb, home);
-    sv.data++;
-    sv.count--;
-    nob_sb_append_buf(&sb, sv.data, sv.count);
-    sv = nob_sv_from_parts(sb.items, sb.count);
-    sb.count = 0;
+    path++;
+    path_len--;
   }
-  
-  nob_sb_append_cstr(&sb, dirname((char*)nob_temp_sv_to_cstr(sv)));
-  const char *path = nob_temp_sv_to_cstr(nob_sv_from_parts(sb.items, sb.count));
-  char *res = realpath(path, 0);
-  if (res == NULL) {
+  nob_sb_append_buf(&sb, path, path_len);
+  path = nob_temp_sv_to_cstr(nob_sv_from_parts(sb.items, sb.count));
+  dir_path = dirname(strdup((char *)path));
+  sb.count = 0;
+  nob_sb_append_cstr(&sb, dir_path);
+  path_out = (char *)nob_temp_sv_to_cstr(nob_sv_from_parts(sb.items, sb.count));
+  path_out = realpath(path_out, 0);
+  if (path_out == NULL) {
     char *errStr = strerror(errno);
-    nob_log(NOB_ERROR, "Failed to build realpath from path %s : %s", path,
+    nob_log(NOB_ERROR, "Failed to build realpath from path %s : %s", path_out,
             errStr);
     nob_return_defer(NULL);
   }
   sb.count = 0;
-  nob_sb_append_cstr(&sb, res);
+  nob_sb_append_cstr(&sb, path_out);
   nob_sb_append_cstr(&sb, "/");
-  nob_sb_append_cstr(&sb, basename((char*)nob_temp_sv_to_cstr(sv)));
-  nob_return_defer(strdup(nob_temp_sv_to_cstr(nob_sv_from_parts(sb.items, sb.count))));
+  nob_sb_append_cstr(&sb, basename((char *)path));
+  nob_return_defer(
+      strdup(nob_temp_sv_to_cstr(nob_sv_from_parts(sb.items, sb.count))));
 defer:
-  free(res);
+  if (path_out != NULL)
+    free(path_out);
+  if (dir_path != NULL)
+    free(dir_path);
   nob_sb_free(sb);
   return result;
 }
 
-void free_manifest(Manifest *manifest) {
-  for (size_t i = 0; i < manifest->count; i++) {
-    free((void *)manifest->items[i].src);
-    free((void *)manifest->items[i].dest);
-  }
-  nob_da_free(*manifest);
-}
+void free_manifest(Manifest *manifest) { nob_da_free(*manifest); }
 
 bool parse_manifest(Opts *opts, Manifest *manifest) {
   bool result = true;
   size_t line_no = 0;
   Nob_String_Builder sb = {0};
   Nob_String_View sv, sv_seg, src, dest, mode;
-  char *src_path, *dest_path;
   enum LINKMODE link_mode;
   nob_log(NOB_INFO, "Parsing manifest at %s", opts->manifest);
   nob_read_entire_file(opts->manifest, &sb);
@@ -120,18 +144,12 @@ bool parse_manifest(Opts *opts, Manifest *manifest) {
               line_no);
       nob_return_defer(false);
     }
-    src_path = get_realpath(opts, src);
-    if (src_path == NULL)
-      nob_return_defer(false);
     PARSE_FIELD(dest);
     if (dest.count <= 0) {
       nob_log(NOB_ERROR, "%s:%zu: Failed to parse dest filed", opts->manifest,
               line_no);
       nob_return_defer(false);
     }
-    dest_path = get_realpath(opts, dest);
-    if (dest_path == NULL)
-      nob_return_defer(false);
     PARSE_FIELD(mode);
     if (mode.count <= 0) {
       nob_log(NOB_ERROR, "%s:%zu: Failed to parse mode field", opts->manifest,
@@ -143,8 +161,8 @@ bool parse_manifest(Opts *opts, Manifest *manifest) {
       }
     }
     nob_da_append(manifest,
-                  ((ManifestField){src_path,
-                                   dest_path, link_mode}));
+                  ((ManifestField){nob_temp_sv_to_cstr(src),
+                                   nob_temp_sv_to_cstr(dest), link_mode}));
   }
 defer:
   for (size_t i = 0; i < manifest->count; i++) {
@@ -153,5 +171,73 @@ defer:
            manifest->items[i].mode);
   }
   nob_sb_free(sb);
+  return result;
+}
+
+typedef bool (*Linker)(enum LINKMODE mode, const char *from, const char *to);
+bool dryLinker(enum LINKMODE mode, const char *from, const char *to) {
+  bool result = true;
+  char *dest = NULL;
+  dest = resolveHome(to);
+  if (dest == NULL) {
+    nob_return_defer(false);
+  }
+  if (nob_file_exists(dest)) {
+    nob_log(NOB_WARNING,
+            "%s already exists. Will overwrite the existing directory", dest);
+  }
+  nob_log(NOB_INFO, "Linking %s => %s", from, dest);
+defer:
+  free(dest);
+  return result;
+}
+bool trueLinker(enum LINKMODE mode, const char *from, const char *to) {
+  bool result = true;
+  char *dest = NULL;
+  dest = resolveHome(to);
+  if (dest == NULL) {
+    nob_return_defer(false);
+  }
+  if (nob_file_exists(dest)) {
+    nob_log(NOB_WARNING,
+            "%s already exists. Will overwrite the existing directory", dest);
+  }
+  if (!nob_mkdir_if_not_exists(dirname(nob_temp_strdup(dest)))) {
+    nob_log(NOB_ERROR, "Failed to build dirs for %s", dest);
+    nob_return_defer(false);
+  };
+  nob_log(NOB_INFO, "Linking %s => %s", from, dest);
+  symlink(from, dest);
+defer:
+  free(dest);
+  return result;
+}
+
+bool link_manifest(Opts *opts, Manifest *manifest) {
+  bool result = true;
+  char *src = NULL;
+  Linker linker;
+  ManifestField *field;
+  if (opts->dryRun) {
+    linker = dryLinker;
+    nob_log(NOB_INFO,
+            "Using dry run linker to link manifest. No files will be linked");
+  } else {
+    linker = trueLinker;
+    nob_log(NOB_INFO,
+            "Using true linker to link manifest. Files will be linked");
+  }
+  for (size_t i = 0; i < manifest->count; i++) {
+    field = &manifest->items[i];
+    src = get_realpath(opts, field->src);
+    if (src == NULL) {
+      nob_log(NOB_ERROR, "Failed to build src realpath for %s", field->src);
+      nob_return_defer(false);
+    }
+    linker(field->mode, src, field->dest);
+  }
+defer:
+  if (src != NULL)
+    free(src);
   return result;
 }

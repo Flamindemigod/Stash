@@ -22,6 +22,7 @@ int main(int argc, char **argv) {
     generate_example_manifest(&opts);
     nob_return_defer(0);
   }
+  link_manifest(&opts, &manifest);
 defer:
   free_manifest(&manifest);
   return result;
