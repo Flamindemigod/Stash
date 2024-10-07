@@ -74,7 +74,7 @@ defer:
   return result;
 }
 
-char *get_realpath(Opts *opts, const char *path) {
+const char *get_realpath(Opts *opts, const char *path) {
   char *result = NULL;
   Nob_String_Builder sb = {0};
   char *dir_path = NULL, *manifest_dir = NULL, *path_out = NULL;
@@ -83,7 +83,7 @@ char *get_realpath(Opts *opts, const char *path) {
     nob_return_defer(NULL);
   }
   if (path[0] != '~') {
-    manifest_dir = dirname(opts->manifest);
+    manifest_dir = dirname(strdup(opts->manifest));
     nob_sb_append_cstr(&sb, manifest_dir);
     nob_sb_append_cstr(&sb, "/");
   } else {
@@ -109,9 +109,11 @@ char *get_realpath(Opts *opts, const char *path) {
   nob_sb_append_cstr(&sb, path_out);
   nob_sb_append_cstr(&sb, "/");
   nob_sb_append_cstr(&sb, basename((char *)path));
-  nob_return_defer(
-      strdup(nob_temp_sv_to_cstr(nob_sv_from_parts(sb.items, sb.count))));
+  nob_return_defer((char *)
+      nob_temp_sv_to_cstr(nob_sv_from_parts(sb.items, sb.count)));
 defer:
+  if (manifest_dir != NULL)
+    free(manifest_dir);
   if (path_out != NULL)
     free(path_out);
   if (dir_path != NULL)
@@ -222,7 +224,7 @@ defer:
 
 bool link_manifest(Opts *opts, Manifest *manifest) {
   bool result = true;
-  char *src = NULL;
+  const char *src = NULL;
   Linker linker;
   ManifestField *field;
   if (opts->dryRun) {
@@ -244,7 +246,5 @@ bool link_manifest(Opts *opts, Manifest *manifest) {
     linker(opts->forceReplace, field->mode, src, field->dest);
   }
 defer:
-  if (src != NULL)
-    free(src);
   return result;
 }
