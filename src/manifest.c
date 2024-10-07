@@ -174,8 +174,10 @@ defer:
   return result;
 }
 
-typedef bool (*Linker)(enum LINKMODE mode, const char *from, const char *to);
-bool dryLinker(enum LINKMODE mode, const char *from, const char *to) {
+typedef bool (*Linker)(bool force, enum LINKMODE mode, const char *from,
+                       const char *to);
+bool dryLinker(bool force, enum LINKMODE mode, const char *from,
+               const char *to) {
   bool result = true;
   char *dest = NULL;
   dest = resolveHome(to);
@@ -183,15 +185,20 @@ bool dryLinker(enum LINKMODE mode, const char *from, const char *to) {
     nob_return_defer(false);
   }
   if (nob_file_exists(dest)) {
-    nob_log(NOB_WARNING,
-            "%s already exists. Will overwrite the existing directory", dest);
+    if (force) {
+      nob_log(NOB_WARNING, "%s already exists. Removing", dest);
+    } else {
+      nob_log(NOB_WARNING, "%s already exists. Skipping", dest);
+      nob_return_defer(false);
+    }
   }
   nob_log(NOB_INFO, "Linking %s => %s", from, dest);
 defer:
   free(dest);
   return result;
 }
-bool trueLinker(enum LINKMODE mode, const char *from, const char *to) {
+bool trueLinker(bool force, enum LINKMODE mode, const char *from,
+                const char *to) {
   bool result = true;
   char *dest = NULL;
   dest = resolveHome(to);
@@ -199,8 +206,13 @@ bool trueLinker(enum LINKMODE mode, const char *from, const char *to) {
     nob_return_defer(false);
   }
   if (nob_file_exists(dest)) {
-    nob_log(NOB_WARNING,
-            "%s already exists. Will overwrite the existing directory", dest);
+    if (force) {
+      nob_log(NOB_WARNING, "%s already exists. Removing", dest);
+      remove(dest);
+    } else {
+      nob_log(NOB_WARNING, "%s already exists. Skipping", dest);
+      nob_return_defer(false);
+    }
   }
   if (!nob_mkdir_if_not_exists(dirname(nob_temp_strdup(dest)))) {
     nob_log(NOB_ERROR, "Failed to build dirs for %s", dest);
@@ -234,7 +246,7 @@ bool link_manifest(Opts *opts, Manifest *manifest) {
       nob_log(NOB_ERROR, "Failed to build src realpath for %s", field->src);
       nob_return_defer(false);
     }
-    linker(field->mode, src, field->dest);
+    linker(opts->forceReplace, field->mode, src, field->dest);
   }
 defer:
   if (src != NULL)

@@ -5,6 +5,7 @@ typedef struct {
   char *manifest;
   char *version;
   bool dryRun;
+  bool forceReplace;
 } Opts;
 
 #define FAILED_PARSING 0

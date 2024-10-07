@@ -7,6 +7,7 @@
 void init_opts(Opts *opts) {
   opts->manifest = "./.MANIFEST";
   opts->dryRun = false;
+  opts->forceReplace = false;
 #ifdef VERSION
   opts->version = VERSION;
 #else
@@ -21,6 +22,7 @@ void printUsage(Opts *opts) {
       &sb, nob_temp_sprintf("%s [-h | --help] [-v | --version] {...Options}\n",
                             opts->program));
   nob_sb_append_cstr(&sb, "Options\n");
+  nob_sb_append_cstr(&sb, "\t-f   --force\t\t\tForce replace links\n\n");
   nob_sb_append_cstr(&sb, "\t--manifest {MANIFEST}\t\tDefault: ./.MANIFEST"
                           "\n\t\t\t\t\tConflicts with --generate-manifest\n\n");
   nob_sb_append_cstr(&sb,
@@ -96,7 +98,9 @@ int parseOpts(Opts *opts, int *argc, char ***argv) {
       }
     } else if MATCH_ARG ("--dry-run") {
       opts->dryRun = true;
-    } else {
+    } else if (MATCH_ARG ("--force") || MATCH_ARG("-f")) {
+      opts->forceReplace = true;
+    }else {
       nob_log(NOB_ERROR, "Invalid Subcommand %s", subcommand);
       printUsage(opts);
       nob_return_defer(FAILED_PARSING);
