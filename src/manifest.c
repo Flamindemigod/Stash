@@ -1,12 +1,6 @@
 #include "manifest.h"
 #include "nob.h"
 #include <libgen.h>
-#include <stdbool.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
-#include <unistd.h>
 
 #define WRITE(str) fputs(str, fd);
 #define PARSE_FIELD(sv_out)                                                    \
@@ -53,7 +47,7 @@ defer:
   return result;
 }
 
-char *resolveHome(const char *path) {
+char *resolveHome(Opts *opts, const char *path) {
   char *result = NULL;
   Nob_String_Builder sb = {0};
   size_t path_len = strlen(path);
@@ -61,8 +55,12 @@ char *resolveHome(const char *path) {
     nob_return_defer(NULL);
   }
   if (path[0] == '~') {
-    const char *home = getenv("HOME");
-    nob_sb_append_cstr(&sb, home);
+    if (opts->homeDir == NULL){
+      nob_log(NOB_ERROR, "If you have ~ in your manifest paths you need to supply -g or --home to stash");
+      opts->unwind=true;
+      nob_return_defer(NULL);
+    }
+    nob_sb_append_cstr(&sb, opts->homeDir);
     path++;
     path_len--;
   }
@@ -87,8 +85,13 @@ const char *get_realpath(Opts *opts, const char *path) {
     nob_sb_append_cstr(&sb, manifest_dir);
     nob_sb_append_cstr(&sb, "/");
   } else {
-    const char *home = getenv("HOME");
-    nob_sb_append_cstr(&sb, home);
+    if (opts->homeDir == NULL){
+      nob_log(NOB_ERROR, "If you have ~ in your manifest paths you need to supply -g or --home to stash");
+      nob_log(NOB_ERROR, "you can always do -g ~ if you want link for the current user as bash will auto expand it for you");
+      opts->unwind=true;
+      nob_return_defer(NULL);
+    }
+    nob_sb_append_cstr(&sb, opts->homeDir);
     path++;
     path_len--;
   }
@@ -111,6 +114,7 @@ const char *get_realpath(Opts *opts, const char *path) {
   nob_sb_append_cstr(&sb, basename((char *)path));
   nob_return_defer(
       (char *)nob_temp_sv_to_cstr(nob_sv_from_parts(sb.items, sb.count)));
+
 defer:
   if (manifest_dir != NULL)
     free(manifest_dir);
@@ -173,18 +177,18 @@ defer:
   return result;
 }
 
-typedef bool (*Linker)(bool force, enum LINKMODE mode, const char *from,
+typedef bool (*Linker)(Opts *opts, enum LINKMODE mode, const char *from,
                        const char *to);
-bool dryLinker(bool force, enum LINKMODE mode, const char *from,
+bool dryLinker(Opts *opts, enum LINKMODE mode, const char *from,
                const char *to) {
   bool result = true;
   char *dest = NULL;
-  dest = resolveHome(to);
+  dest = resolveHome(opts, to);
   if (dest == NULL) {
     nob_return_defer(false);
   }
   if (nob_file_exists(dest)) {
-    if (force) {
+    if (opts->forceReplace) {
       nob_log(NOB_WARNING, "%s already exists. Removing", dest);
     } else {
       nob_log(NOB_WARNING, "%s already exists. Skipping", dest);
@@ -200,16 +204,16 @@ defer:
   free(dest);
   return result;
 }
-bool trueLinker(bool force, enum LINKMODE mode, const char *from,
+bool trueLinker(Opts *opts, enum LINKMODE mode, const char *from,
                 const char *to) {
   bool result = true;
   char *dest = NULL;
-  dest = resolveHome(to);
+  dest = resolveHome(opts, to);
   if (dest == NULL) {
     nob_return_defer(false);
   }
   if (nob_file_exists(dest)) {
-    if (force) {
+    if (opts->forceReplace) {
       nob_log(NOB_WARNING, "%s already exists. Removing", dest);
       remove(dest);
     } else {
@@ -247,14 +251,14 @@ bool link_manifest(Opts *opts, Manifest *manifest) {
     nob_log(NOB_INFO,
             "Using true linker to link manifest. Files will be linked");
   }
-  for (size_t i = 0; i < manifest->count; i++) {
+  for (size_t i = 0; i < manifest->count && !opts->unwind; i++) {
     field = &manifest->items[i];
     src = get_realpath(opts, field->src);
     if (src == NULL) {
       nob_log(NOB_ERROR, "Failed to build src realpath for %s", field->src);
       nob_return_defer(false);
     }
-    linker(opts->forceReplace, field->mode, src, field->dest);
+    linker(opts, field->mode, src, field->dest);
   }
 defer:
   return result;

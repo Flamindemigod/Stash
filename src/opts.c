@@ -8,6 +8,8 @@ void init_opts(Opts *opts) {
   opts->manifest = "./.MANIFEST";
   opts->dryRun = false;
   opts->forceReplace = false;
+  opts->homeDir = false;
+  opts->unwind = false;
 #ifdef VERSION
   opts->version = VERSION;
 #else
@@ -23,6 +25,7 @@ void printUsage(Opts *opts) {
                             opts->program));
   nob_sb_append_cstr(&sb, "Options\n");
   nob_sb_append_cstr(&sb, "\t-f   --force\t\t\tForce replace links\n\n");
+  nob_sb_append_cstr(&sb, "\t-g   --home\t\t\tPath to your home directory\n\n");
   nob_sb_append_cstr(&sb, "\t--manifest {MANIFEST}\t\tDefault: ./.MANIFEST"
                           "\n\t\t\t\t\tConflicts with --generate-manifest\n\n");
   nob_sb_append_cstr(&sb,
@@ -98,9 +101,22 @@ int parseOpts(Opts *opts, int *argc, char ***argv) {
       }
     } else if MATCH_ARG ("--dry-run") {
       opts->dryRun = true;
-    } else if (MATCH_ARG ("--force") || MATCH_ARG("-f")) {
+    } else if (MATCH_ARG("--home") || MATCH_ARG("-g")) {
+      if (*argc <= 0) {
+        nob_log(NOB_ERROR, "--home or -g requires a path");
+        printUsage(opts);
+        nob_return_defer(FAILED_PARSING);
+      }
+
+      char *home_path = nob_shift_args(argc, argv);
+      if (!nob_file_exists(home_path)) {
+        nob_log(NOB_ERROR, "The home path %s doesnt exist", home_path);
+        nob_return_defer(FAILED_PARSING);
+      }
+      opts->homeDir = home_path;
+    } else if (MATCH_ARG("--force") || MATCH_ARG("-f")) {
       opts->forceReplace = true;
-    }else {
+    } else {
       nob_log(NOB_ERROR, "Invalid Subcommand %s", subcommand);
       printUsage(opts);
       nob_return_defer(FAILED_PARSING);
