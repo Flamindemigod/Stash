@@ -109,8 +109,8 @@ const char *get_realpath(Opts *opts, const char *path) {
   nob_sb_append_cstr(&sb, path_out);
   nob_sb_append_cstr(&sb, "/");
   nob_sb_append_cstr(&sb, basename((char *)path));
-  nob_return_defer((char *)
-      nob_temp_sv_to_cstr(nob_sv_from_parts(sb.items, sb.count)));
+  nob_return_defer(
+      (char *)nob_temp_sv_to_cstr(nob_sv_from_parts(sb.items, sb.count)));
 defer:
   if (manifest_dir != NULL)
     free(manifest_dir);
@@ -160,6 +160,8 @@ bool parse_manifest(Opts *opts, Manifest *manifest) {
     } else {
       if (nob_sv_eq(mode, nob_sv_from_cstr("symlink"))) {
         link_mode = SYMLINK;
+      } else if (nob_sv_eq(mode, nob_sv_from_cstr("copy"))) {
+        link_mode = COPY;
       }
     }
     nob_da_append(manifest,
@@ -189,7 +191,11 @@ bool dryLinker(bool force, enum LINKMODE mode, const char *from,
       nob_return_defer(false);
     }
   }
-  nob_log(NOB_INFO, "Linking %s => %s", from, dest);
+  if (mode == SYMLINK) {
+    nob_log(NOB_INFO, "Linking %s => %s", from, dest);
+  } else if (mode == COPY) {
+    nob_log(NOB_INFO, "Copying %s => %s", from, dest);
+  }
 defer:
   free(dest);
   return result;
@@ -215,8 +221,13 @@ bool trueLinker(bool force, enum LINKMODE mode, const char *from,
     nob_log(NOB_ERROR, "Failed to build dirs for %s", dest);
     nob_return_defer(false);
   };
-  nob_log(NOB_INFO, "Linking %s => %s", from, dest);
-  symlink(from, dest);
+  if (mode == SYMLINK) {
+    nob_log(NOB_INFO, "Linking %s => %s", from, dest);
+    symlink(from, dest);
+  } else if (mode == COPY) {
+    nob_log(NOB_INFO, "Copying %s => %s", from, dest);
+    nob_copy_directory_recursively(from, dest);
+  }
 defer:
   free(dest);
   return result;

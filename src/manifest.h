@@ -1,7 +1,7 @@
 #include "opts.h"
 #include <stdbool.h>
 #include <stdio.h>
-enum LINKMODE { SYMLINK };
+enum LINKMODE { SYMLINK, COPY };
 
 typedef struct {
   const char *src;
