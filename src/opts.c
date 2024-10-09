@@ -80,25 +80,25 @@ int parseOpts(Opts *opts, int *argc, char ***argv) {
         }
       }
     } else if MATCH_ARG ("--generate-manifest") {
+      char *manifest_path;
       if (*argc <= 0) {
-        nob_log(NOB_ERROR, "--generate-manifest requires a path");
-        printUsage(opts);
+        manifest_path = opts->manifest;
+      } else {
+        manifest_path = nob_shift_args(argc, argv);
+      }
+      if (nob_file_exists(manifest_path)) {
+        nob_log(NOB_ERROR, "%s exists.", manifest_path);
+        nob_log(NOB_INFO, "if you want to use a existing config",
+                manifest_path);
+        nob_log(NOB_INFO, "run '%s --manifest %s'", opts->program,
+                manifest_path);
         nob_return_defer(FAILED_PARSING);
       } else {
-        char *manifest_path = nob_shift_args(argc, argv);
-        if (nob_file_exists(manifest_path)) {
-          nob_log(NOB_ERROR, "%s exists.", manifest_path);
-          nob_log(NOB_INFO, "if you want to use a existing config at %s",
-                  manifest_path);
-          nob_log(NOB_INFO, "run '%s --manifest %s'", opts->program,
-                  manifest_path);
-          nob_return_defer(FAILED_PARSING);
-        } else {
-          opts->manifest = manifest_path;
-          generate_example_manifest(opts);
-          nob_return_defer(PARSED_NOW_EXIT);
-        }
+        opts->manifest = manifest_path;
+        generate_example_manifest(opts);
+        nob_return_defer(PARSED_NOW_EXIT);
       }
+
     } else if MATCH_ARG ("--dry-run") {
       opts->dryRun = true;
     } else if (MATCH_ARG("--home") || MATCH_ARG("-g")) {
