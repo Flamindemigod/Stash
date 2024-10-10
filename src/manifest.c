@@ -55,9 +55,10 @@ char *resolveHome(Opts *opts, const char *path) {
     nob_return_defer(NULL);
   }
   if (path[0] == '~') {
-    if (opts->homeDir == NULL){
-      nob_log(NOB_ERROR, "If you have ~ in your manifest paths you need to supply -g or --home to stash");
-      opts->unwind=true;
+    if (opts->homeDir == NULL) {
+      nob_log(NOB_ERROR, "If you have ~ in your manifest paths you need to "
+                         "supply -g or --home to stash");
+      opts->unwind = true;
       nob_return_defer(NULL);
     }
     nob_sb_append_cstr(&sb, opts->homeDir);
@@ -85,10 +86,12 @@ const char *get_realpath(Opts *opts, const char *path) {
     nob_sb_append_cstr(&sb, manifest_dir);
     nob_sb_append_cstr(&sb, "/");
   } else {
-    if (opts->homeDir == NULL){
-      nob_log(NOB_ERROR, "If you have ~ in your manifest paths you need to supply -g or --home to stash");
-      nob_log(NOB_ERROR, "you can always do -g ~ if you want link for the current user as bash will auto expand it for you");
-      opts->unwind=true;
+    if (opts->homeDir == NULL) {
+      nob_log(NOB_ERROR, "If you have ~ in your manifest paths you need to "
+                         "supply -g or --home to stash");
+      nob_log(NOB_ERROR, "you can always do -g ~ if you want link for the "
+                         "current user as bash will auto expand it for you");
+      opts->unwind = true;
       nob_return_defer(NULL);
     }
     nob_sb_append_cstr(&sb, opts->homeDir);
@@ -177,6 +180,24 @@ defer:
   return result;
 }
 
+bool isRootOwnedPath(const char *path) {
+  bool result = false;
+  struct stat statBuf;
+  char *temp_path = strdup(path);
+  while (true) {
+    dirname(temp_path);
+    if (strlen(temp_path) < 1)
+      nob_return_defer(false);
+    if (nob_file_exists(temp_path))
+      break;
+  }
+  stat(temp_path, &statBuf);
+  nob_return_defer(statBuf.st_uid == 0);
+defer:
+  free(temp_path);
+  return result;
+}
+
 typedef bool (*Linker)(Opts *opts, enum LINKMODE mode, const char *from,
                        const char *to);
 bool dryLinker(Opts *opts, enum LINKMODE mode, const char *from,
@@ -185,6 +206,28 @@ bool dryLinker(Opts *opts, enum LINKMODE mode, const char *from,
   char *dest = NULL;
   dest = resolveHome(opts, to);
   if (dest == NULL) {
+    nob_return_defer(false);
+  }
+  bool isRootPath = isRootOwnedPath(dest);
+  if (isRootPath && mode != COPY) {
+    nob_log(NOB_ERROR,
+            "%s is a root owned path and only supports Copy mode. Skipping",
+            dest);
+    nob_return_defer(false);
+  }
+  if (isRootPath && !opts->isRoot) {
+    nob_log(NOB_WARNING,
+            "%s is a root owned path and you dont have sufficient "
+            "permissions. Skipping",
+            dest);
+    nob_return_defer(false);
+  } else if (opts->isRoot && !isRootPath && !opts->noPreservePerm) {
+    nob_log(NOB_WARNING,
+            "%s is a not owned path and Skipping to preserve ownership", dest);
+    nob_log(NOB_WARNING,
+            "if you want to still copy with root perms add the "
+            "--no-preserve-perm flag",
+            dest);
     nob_return_defer(false);
   }
   if (nob_file_exists(dest)) {
@@ -210,6 +253,28 @@ bool trueLinker(Opts *opts, enum LINKMODE mode, const char *from,
   char *dest = NULL;
   dest = resolveHome(opts, to);
   if (dest == NULL) {
+    nob_return_defer(false);
+  }
+  bool isRootPath = isRootOwnedPath(dest);
+  if (isRootPath && mode != COPY) {
+    nob_log(NOB_ERROR,
+            "%s is a root owned path and only supports Copy mode. Skipping",
+            dest);
+    nob_return_defer(false);
+  }
+  if (isRootPath && !opts->isRoot) {
+    nob_log(NOB_WARNING,
+            "%s is a root owned path and you dont have sufficient "
+            "permissions. Skipping",
+            dest);
+    nob_return_defer(false);
+  } else if (opts->isRoot && !isRootPath && !opts->noPreservePerm) {
+    nob_log(NOB_WARNING,
+            "%s is a not owned path and Skipping to preserve ownership", dest);
+    nob_log(NOB_WARNING,
+            "if you want to still copy with root perms add the "
+            "--no-preserve-perm flag",
+            dest);
     nob_return_defer(false);
   }
   if (nob_file_exists(dest)) {

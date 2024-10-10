@@ -8,6 +8,8 @@ typedef struct {
   bool dryRun;
   bool forceReplace;
   bool unwind;
+  bool isRoot;
+  bool noPreservePerm;
 } Opts;
 
 #define FAILED_PARSING 0

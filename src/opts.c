@@ -10,6 +10,12 @@ void init_opts(Opts *opts) {
   opts->forceReplace = false;
   opts->homeDir = false;
   opts->unwind = false;
+  opts->noPreservePerm = false;
+  if (getuid() == 0) {
+    opts->isRoot = true;
+  } else {
+    opts->isRoot = false;
+  }
 #ifdef VERSION
   opts->version = VERSION;
 #else
@@ -24,16 +30,20 @@ void printUsage(Opts *opts) {
       &sb, nob_temp_sprintf("%s [-h | --help] [-v | --version] {...Options}\n",
                             opts->program));
   nob_sb_append_cstr(&sb, "Options\n");
-  nob_sb_append_cstr(&sb, "\t-f   --force\t\t\tForce replace links\n\n");
-  nob_sb_append_cstr(&sb, "\t-g   --home\t\t\tPath to your home directory\n\n");
   nob_sb_append_cstr(&sb, "\t--manifest {MANIFEST}\t\tDefault: ./.MANIFEST"
                           "\n\t\t\t\t\tConflicts with --generate-manifest\n\n");
   nob_sb_append_cstr(&sb,
                      "\t--generate-manifest {MANIFEST}\tDefault: ./.MANIFEST"
                      "\n\t\t\t\t\tConflicts with --manifest\n\n");
+  nob_sb_append_cstr(&sb, "\t-f   --force\t\t\tForce replace links\n\n");
+  nob_sb_append_cstr(&sb, "\t-g   --home\t\t\tPath to your home directory\n\n");
   nob_sb_append_cstr(&sb, "\t--dry-run\t\t\t"
                           "No file changes take place.\n\t\t\t\t\t"
-                          "Just outputs what links where\n");
+                          "Just outputs what links where\n\n");
+  nob_sb_append_cstr(&sb, "\t--no-preserve-perm\t\t"
+                          "Used when running as root and to link files to non "
+                          "root locations.\n\t\t\t\t\t"
+                          "This however sets files to be owned by root\n");
   nob_sb_append_null(&sb);
   fprintf(stderr, "%s", sb.items);
   nob_sb_free(sb);
@@ -101,6 +111,12 @@ int parseOpts(Opts *opts, int *argc, char ***argv) {
 
     } else if MATCH_ARG ("--dry-run") {
       opts->dryRun = true;
+    } else if MATCH_ARG ("--no-preserve-perm") {
+      opts->noPreservePerm = true;
+      if (!opts->isRoot) {
+        nob_log(NOB_WARNING, "--no-preserve-perm is a root only permission. It "
+                             "will not do anything when run as non-root");
+      }
     } else if (MATCH_ARG("--home") || MATCH_ARG("-g")) {
       if (*argc <= 0) {
         nob_log(NOB_ERROR, "--home or -g requires a path");
